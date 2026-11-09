@@ -35,7 +35,7 @@ flowchart LR
     G --> H[Guess which image<br/>they were viewing]
 ```
 
-**Step 1: Get CNN features.** We run each image through a pretrained ResNet-50 and save features from three layers: early, middle, and deep.
+**Step 1: Get CNN features.** We run each image through a pretrained ResNet-50 and extract features from three layers (early, middle, and deep). Each layer slides small learned filters, called kernels, across the image to produce feature maps. Early kernels detect edges and colors, while deeper ones combine these to detect textures, object parts, and whole objects. We average each layer's feature maps across space to get one feature vector per image.
 
 <p align="center">
   <img src="assets/resnet_architecture.svg" alt="ResNet-50 architecture with the early, middle, and deep layers used for feature extraction" width="700">
