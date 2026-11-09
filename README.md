@@ -45,7 +45,7 @@ flowchart LR
 
 **Step 3: Decode the image with Bayes.** Now we flip it. Given a brain scan, we score every candidate image by its likelihood (how well its predicted brain response matches the real scan) and its prior (how likely that image was to begin with), then pick the image with the best combined score.
 
-**Step 4: Compare layers to brain regions.** We check which CNN layer best predicts each brain region. If CNNs really mirror the brain, early layers should match early regions and deep layers should match later regions:
+**Step 4: Compare layers to brain regions.** We check which CNN layer best predicts each brain region. If CNNs really mirror the brain, early layers should match early regions and deep layers should match later regions. The figure shows the brain from two angles because some regions sit on the outside of the brain and others on the inside. The **lateral** view is the outer surface seen from the side, and the **medial** view is the inner surface you'd see if you split the brain down the middle. LOC only appears in the lateral view because it sits on the outer surface, while RSC and PPA only appear in the medial view because they sit on the inner surface and underside. Early visual cortex shows up in both because it wraps around the back of the brain.
 
 <p align="center">
   <img src="assets/cnn_layers_brain_regions.svg" alt="CNN layers mapped to expected brain regions: early to EVC, middle to LOC, deep to PPA, OPA, and RSC" width="900">
