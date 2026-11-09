@@ -1,7 +1,7 @@
 # Mind vs. Machine: fMRI Decoding with CNNs and Bayesian Inference
 
 <p align="center">
-  <img src="brain_scan.gif" alt="Animated brain scan with visual cortex activation" width="320">
+  <img src="assets/brain_scan.gif" alt="Animated brain scan with visual cortex activation" width="320">
 </p>
 
 Do artificial and biological vision systems process images in similar ways?
@@ -38,7 +38,7 @@ flowchart LR
 **Step 1: Get CNN features.** We run each image through a pretrained ResNet-50 and save features from three layers: early, middle, and deep.
 
 <p align="center">
-  <img src="resnet_architecture.svg" alt="ResNet-50 architecture with the early, middle, and deep layers used for feature extraction" width="700">
+  <img src="assets/resnet_architecture.svg" alt="ResNet-50 architecture with the early, middle, and deep layers used for feature extraction" width="700">
 </p>
 
 **Step 2: Predict brain activity.** A regression model learns how the CNN features relate to fMRI voxel activity in each brain region. We check how well it predicts brain responses for images it hasn't seen before.
@@ -48,7 +48,7 @@ flowchart LR
 **Step 4: Compare layers to brain regions.** We check which CNN layer best predicts each brain region. If CNNs really mirror the brain, early layers should match early regions and deep layers should match later regions:
 
 <p align="center">
-  <img src="cnn_layers_brain_regions.svg" alt="CNN layers mapped to expected brain regions: early to EVC, middle to LOC, deep to PPA, OPA, and RSC" width="900">
+  <img src="assets/cnn_layers_brain_regions.svg" alt="CNN layers mapped to expected brain regions: early to EVC, middle to LOC, deep to PPA, OPA, and RSC" width="900">
 </p>
 
 **Step 5: Copulas.** Regression assumes the relationship between features and brain activity is linear, but that might not be true. Copulas let us look at the shape of the relationship, especially at the extremes. A Gaussian copula treats the relationship as symmetric, Clayton focuses on cases where both values are low, and Gumbel focuses on cases where both values are high.
@@ -80,13 +80,11 @@ The data files are too big for GitHub, so they're not included in this repo.
 
 ```
 mind-vs-machine-fmri-decoding/
+├── assets/          # Images and diagrams used in this README
 ├── data/            # BOLD5000 images and fMRI data (not tracked)
 ├── notebooks/       # Analysis notebooks
 ├── src/             # Feature extraction, models, and decoding code
 ├── results/         # Plots and outputs
-├── brain_scan.gif
-├── cnn_layers_brain_regions.svg
-├── resnet_architecture.svg
 ├── LICENSE
 └── README.md
 ```
