@@ -52,6 +52,10 @@ flowchart LR
 
 **Step 5: Copulas.** Regression captures the average relationship between predicted and actual brain activity, but not whether that relationship changes at the extremes. Using unseen images, we pair each region's predicted response with its actual response and fit several copula families to these pairs. A Gaussian copula treats the relationship as symmetric, Clayton captures stronger agreement when both values are low, and Gumbel captures stronger agreement when both values are high. We pick the best-fitting family using AIC.
  
+<p align="center">
+  <img src="assets/copulas.jpg" alt="Gaussian versus Clayton copula comparison" width="320">
+</p>
+
 ---
  
 ## Data
