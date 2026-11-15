@@ -39,6 +39,7 @@ flowchart LR
 <p align="center">
   <img src="assets/resnet_architecture.svg" alt="ResNet-50 architecture with the early, middle, and deep layers used for feature extraction" width="700">
 </p>
+
 **Step 2: Predict brain activity.** A regression model learns how the CNN features relate to fMRI voxel activity in each brain region. We check how well it predicts brain responses for images it hasn't seen before.
  
 **Step 3: Decode the image with Bayes.** Now we flip it. Given a brain scan, we score every candidate image by its likelihood (how well its predicted brain response matches the real scan) and its prior (how likely that image was to begin with), then pick the image with the best combined score.
