@@ -39,6 +39,7 @@ flowchart LR
 <p align="center">
   <img src="assets/resnet_architecture.svg" alt="ResNet-50 architecture with the early, middle, and deep layers used for feature extraction" width="700">
 </p>
+
 **Step 2: Predict brain activity.** A regression model learns how the CNN features relate to fMRI voxel activity in each brain region. We check how well it predicts brain responses for images it hasn't seen before.
  
 **Step 3: Decode the image with Bayes.** Now we flip it. Given a brain scan, we score every candidate image by its likelihood (how well its predicted brain response matches the real scan) and its prior (how likely that image was to begin with), then pick the image with the best combined score.
@@ -48,6 +49,7 @@ flowchart LR
 <p align="center">
   <img src="assets/cnn_layers_brain_regions.svg" alt="CNN layers mapped to expected brain regions: early to EVC, middle to LOC, deep to PPA, OPA, and RSC" width="900">
 </p>
+
 **Step 5: Copulas.** Regression captures the average relationship between predicted and actual brain activity, but not whether that relationship changes at the extremes. Using unseen images, we pair each region's predicted response with its actual response and fit several copula families to these pairs. A Gaussian copula treats the relationship as symmetric, Clayton captures stronger agreement when both values are low, and Gumbel captures stronger agreement when both values are high. We pick the best-fitting family using AIC.
  
 ---
