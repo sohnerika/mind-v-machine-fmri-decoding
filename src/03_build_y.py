@@ -49,7 +49,15 @@ OUT.mkdir(parents=True, exist_ok=True)
 trials = pd.read_csv(TRIALS)
 n_trials = len(trials)
 sessions = trials["session"].to_numpy()
-codes, images = pd.factorize(trials["image"]) # images in order of first appearance
+
+# order images in order of first appearance
+images = []
+codes = []
+for name in trials["image"]:
+    if name not in images:
+        images.append(name)
+    codes.append(images.index(name))
+
 counts = np.bincount(codes)
 rep_ids = np.flatnonzero(counts > 1)
 max_reps = int(counts.max())
@@ -101,8 +109,8 @@ for roi in ROIS:
 
     # avg repeated presentations -> one row per unique image
     y = np.zeros((len(images), Z.shape[1]))
-    np.add.at(y, codes, Z)
-    y /= counts[:, None]
+    for c in range(len(images)):
+        y[c] = Z[codes == c].mean(axis=0)
 
     # keep single presentations of repeated images for noise ceilings later
     R = np.full((len(rep_ids), max_reps, Z.shape[1]), np.nan, dtype=np.float32)

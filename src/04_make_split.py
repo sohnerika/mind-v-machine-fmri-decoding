@@ -15,12 +15,11 @@ What this code does:
 Inputs: results/y/CSI1_images.csv
 Outputs: results/split/ (CSI1_split.npz with train_idx, test_idx, cv_fold;
          CSI1_split.csv, one row per image with its split and fold)
-Run from src/: python 04_make_split.py
+Run from the repo root: python src/04_make_split.py
 """
 
 import argparse
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -36,10 +35,10 @@ IMAGES = REPO / "results" / "y" / f"{args.subject}_images.csv"
 OUT = REPO / "results" / "split"
 OUT.mkdir(parents=True, exist_ok=True)
 
-# == STEP 1: LOAD DATA == # 
+# == STEP 1: LOAD DATA == #
 
 df = pd.read_csv(IMAGES)
-df["source"] = df["ImgType"].str.replace("rep_", "", regex=False)
+df["source"] = df["ImgType"].str.replace("rep_", "", regex=False)   # "rep_coco" -> "coco"
 df["repeated"] = df["n_presentations"] > 1
 
 # seeded random generator, so the split is identical on every run
@@ -47,46 +46,56 @@ rng = np.random.default_rng(args.seed)
 
 # == STEP 2: CREATE TEST SET == #
 
-# all repeats first, 
-# then random fill within each source
-test = set(df.index[df["repeated"]])
+# start the test set with every repeated image
+test = set()
+for i in df.index:
+    if df.loc[i, "repeated"]:
+        test.add(i)
 
-for src, group in df.groupby("source"): # once each for coco, imagenet, scenes
-    target = round(args.test_frac * len(group))  # 20% * 2,000 = 400 test images needed
-    have = int(group["repeated"].sum()) # 45 coco repeats
-    pool = group.index[~group["repeated"]].to_numpy() # 2,000-45 repx = 1,955 coco shown once, draw from here
+# then, for each source, top up to 20% with randomly chosen single-showing images
+for src, group in df.groupby("source"):           # coco, imagenet, scenes (in that order)
+    target = round(args.test_frac * len(group))   # e.g. 20% of 2,000 coco = 400
+    have = int(group["repeated"].sum())           # repeats from this source already in test
+    pool = group[group["repeated"] == False].index.to_numpy()   # images shown once
 
-    # how many more test images we need 
-    # 400-45 = 355 coco images drawn randomly from 1,955 pool 
-    test |= set(rng.choice(pool, target - have, replace=False).tolist()) 
+    picked = rng.choice(pool, target - have, replace=False)     # draw the rest at random
+    for i in picked:
+        test.add(int(i))
 
-test_idx = np.sort(np.fromiter(test, dtype=int))
-train_idx = np.setdiff1d(df.index.to_numpy(), test_idx) # every row not in test = train row
+test_idx = np.array(sorted(test))
+train_idx = np.array([i for i in df.index if i not in test])   # every other image is training
 
 # == STEP 3: K-FOLD CV == #
 
-# CV folds inside the training set,
-# stratified by image source
+# deal the training images into folds, separately for each source
 cv_fold = np.empty(len(train_idx), dtype=int)
 train_sources = df.loc[train_idx, "source"].to_numpy()
-for src in np.unique(train_sources):
-    pos = np.flatnonzero(train_sources == src)
-    rng.shuffle(pos)
-    cv_fold[pos] = np.arange(len(pos)) % args.folds    # deal images into folds in turn
+for src in np.unique(train_sources):              # coco, imagenet, scenes
+    pos = np.flatnonzero(train_sources == src)    # positions of this source's training images
+    rng.shuffle(pos)                              # shuffle them
+    for j, p in enumerate(pos):
+        cv_fold[p] = j % args.folds               # fold 0, 1, 2, 3, 4, 0, 1, ... like dealing cards
 
-assert len(np.intersect1d(train_idx, test_idx)) == 0, "train and test overlap"
+# == STEP 4: CHECKS AND SAVE == #
+
+assert len(set(train_idx) & set(test_idx)) == 0, "train and test overlap"
 assert len(train_idx) + len(test_idx) == len(df), "some images are unassigned"
-assert df.loc[df["repeated"]].index.isin(test_idx).all(), "a repeat is not in test"
+for i in df.index:
+    if df.loc[i, "repeated"]:
+        assert i in test, "a repeat is not in test"
 
 np.savez(OUT / f"{args.subject}_split.npz",
          train_idx=train_idx, test_idx=test_idx, cv_fold=cv_fold,
          seed=args.seed, test_frac=args.test_frac)
+
 df["split"] = "train"
 df.loc[test_idx, "split"] = "test"
 df["cv_fold"] = -1
 df.loc[train_idx, "cv_fold"] = cv_fold
 df[["row", "image", "source", "repeated", "split", "cv_fold"]].to_csv(
     OUT / f"{args.subject}_split.csv", index=False)
+
+# == STEP 5: SUMMARY == #
 
 summary = pd.crosstab(df["source"], df["split"], margins=True, margins_name="total")
 summary["test %"] = (100 * summary["test"] / summary["total"]).round(1)
