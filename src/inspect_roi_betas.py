@@ -1,4 +1,5 @@
-"""Inspect BOLD5000 Release 2.0 ROI betas and check trial order.
+"""
+Written by: Erika Sohn
 
 Usage (inside the folder with CSI1_trials.csv):
     python3 inspect_roi_betas.py

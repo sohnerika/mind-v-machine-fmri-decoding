@@ -1,6 +1,23 @@
-# predict CSI1's voxel responses from each ResNet-50 layer
-# for each layer, standardize + PCA the features (Z), fit ridge with a lambda per voxel
-# chosen by 5 fold CV, predict the test images, and score against CSI1's responses
+"""
+Written by: Erika Sohn
+
+What this code does:
+* Fits Method 1, the encoding model: predicts CSI1's voxel responses from
+  each ResNet-50 layer (layer1 to layer4) across five ROIs
+* For each layer, standardizes the features and reduces them with PCA (Z),
+  then fits a ridge regression per voxel, with each voxel's lambda chosen
+  by 5-fold CV and the model refit on all training images
+* Predicts the 983 test images and scores each voxel by its correlation r
+  with CSI1's measured responses, normalized by its noise ceiling (r / NC)
+* Produces the Table 1 results (median r / noise ceiling by ROI and layer)
+
+Inputs: results/features/resnet50/ (CSI1_layer*.npy)
+        results/y/ (CSI1_{ROI}.npy, CSI1_{ROI}_repeats.npy, CSI1_images.csv)
+        results/split/CSI1_split.npz
+Outputs: results/encoding/resnet50/ (CSI1_layer*_model.npz, CSI1_voxels.csv,
+         CSI1_summary.csv)
+Run from src/: python fit_encoding.py
+"""
 
 import argparse
 import time
@@ -36,12 +53,12 @@ def colcorr(A, B):
     return np.divide((A * B).sum(axis=0), den, out=np.zeros(A.shape[1]), where=den > 0)
 
 
-# -- Train test split images  -- # 
+# == STEP 1: SPLIT IMAGES == # 
+
 # note: the indexes map to the same image for both datasets
 # i.e., row 0 of X = image A = row of Y
 # so this basically tells us that row 0 / image A goes into train, 
 # while row 1 or image B goes into test
-
 split = np.load(SPLIT)
 train_idx, test_idx, cv_fold = split["train_idx"], split["test_idx"], split["cv_fold"]
 n_folds = int(cv_fold.max()) + 1
@@ -51,7 +68,8 @@ rep_test = n_pres_test > 1
 print(f"{args.subject}: {len(train_idx)} train, {len(test_idx)} test "
       f"({rep_test.sum()} repeated), {n_folds} CV folds")
 
-# -- STEP 1: Create Y matrix -- # 
+# == STEP 2: CREATE Y MATRIX == # 
+
 # Y must be a single matrix (images, voxels)
 # one row per image, one col per voxel
 # previously, each ROI was its own array
@@ -83,7 +101,7 @@ def noise_ceiling(n_pres):
 
 nc_all, nc_rep = noise_ceiling(n_pres_test), noise_ceiling(n_pres_test[rep_test])
 
-# -- STEP 2: PCA -- # 
+# == STEP 3: PCA == # 
 voxel_rows, summary_rows = [], []
 for layer in args.layers:
     t0 = time.time()
@@ -106,7 +124,7 @@ for layer in args.layers:
     print(f"  features -> {k} PCs, {100 * pca.explained_variance_ratio_.sum():.1f}% of variance"
           f"  ({time.time() - t0:.0f} s)")
 
-    # -- STEP 3: Ridge regression -- # 
+    # == STEP 4: RIDGE == # 
     # solved through the SVD of Z so that every penalty lambda costs almost nothing
     # Z = U S V^T  ->  W(lambda) = V diag(s / (s^2 + lambda)) U^T Y
     base = np.median((Z_train ** 2).sum(axis=0))
@@ -144,7 +162,7 @@ for layer in args.layers:
             W[:, cols] = Vt.T @ ((s / (s ** 2 + lam))[:, None] * UtY[:, cols])
     resid_var = ((Y_train - ((Z_train - Zm) @ W + Ym)) ** 2).mean(axis=0)
 
-    # -- STEP 4: Predict the test images and score each voxel -- # 
+    # == STEP 4: PREDICT TEST IMGS AND SCORE EACH VOXEL == # 
     Y_pred = (Z_test - Zm) @ W + Ym # Ŷ_test
     r_all = colcorr(Y_pred, Y_test)
     r_rep = colcorr(Y_pred[rep_test], Y_test[rep_test])
@@ -172,7 +190,6 @@ for layer in args.layers:
         "r": r_all, "r_repeats": r_rep, "nc": nc_all, "nc_repeats": nc_rep,
         "lambda": lambdas[best]}))
 
-# -- Save and print the layer x ROI table -- # 
 pd.concat(voxel_rows).to_csv(OUT / f"{args.subject}_voxels.csv", index=False)
 summary = pd.DataFrame(summary_rows)
 summary.to_csv(OUT / f"{args.subject}_summary.csv", index=False)

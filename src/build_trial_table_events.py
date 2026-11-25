@@ -1,12 +1,22 @@
-"""Build a BOLD5000 trial table in true scan order from OpenNeuro events.tsv files,
-and cross-check it against the presentation lists from BOLD5000_Stimuli.
-
-Usage (from Terminal, inside ~/bold5000):
-    python3 build_trial_table_events.py          # CSI1 by default
-    python3 build_trial_table_events.py CSI2
-
-Output: ~/bold5000/<SUBJ>_trials.csv  (one row per trial, scan order)
 """
+Written by: Erika Sohn
+
+What this code does:
+* Builds a BOLD5000 trial table for one subject: one row per trial, in the
+  true order the images were shown in the scanner
+* Reads the trial timing from the OpenNeuro events.tsv files
+* Cross-checks the table against the presentation lists in
+  BOLD5000_Stimuli, to confirm every trial matches the image recorded
+  as shown
+
+Inputs: OpenNeuro events.tsv files and BOLD5000_Stimuli presentation lists
+Output: <SUBJ>_trials.csv (one row per trial, in scan order; 5,254 trials
+        for CSI1)
+Run from Terminal, inside ~/bold5000:
+    python3 build_trial_table_events.py          CSI1 by default
+    python3 build_trial_table_events.py CSI2     another subject
+"""
+
 import re
 import sys
 from pathlib import Path
@@ -33,7 +43,7 @@ def num(pattern, text):
     return int(re.search(pattern, text).group(1))
 
 
-# 1. Main-task events files, in scan order (session, then run)
+# main task events files, in scan order (session, then run)
 all_events = list(EVENTS.glob("ses-*/func/*_events.tsv"))
 files = sorted(
     EVENTS.glob("ses-*/func/*task-5000scenes*_events.tsv"),
@@ -59,12 +69,12 @@ ev["trial_global"] = range(1, len(ev) + 1)
 ev["trial_in_session"] = ev.groupby("session").cumcount() + 1
 ev["n_presentations"] = ev.groupby("image")["image"].transform("size")
 
-# 2. Link to image files
+# link to image files
 imgs = {p.name: p for p in STIM.rglob("Presented_Stimuli/*/*") if p.is_file()}
 ev["image_path"] = ev["image"].map(lambda n: str(imgs.get(n, "")))
 missing = sorted(set(ev.loc[ev["image_path"] == "", "image"]))
 
-# 3. Cross-check each scanned run against the presentation lists
+# cross check each scanned run against the presentation lists
 def read_list(f):
     return tuple(l.strip().removeprefix("rep_") for l in f.read_text().splitlines() if l.strip())
 
@@ -83,20 +93,19 @@ for (s, r), grp in ev.groupby(["session", "run"]):
     else:
         unmatched.append((s, r))
 
-# Do the Sess/Run columns inside the events files agree with the file names?
+# do the Sess/Run columns inside the events files agree with the file names?
 col_note = ""
 if {"Sess", "Run"} <= set(ev.columns):
     diff = ev[(ev["Sess"] != ev["session"]) | (ev["Run"] != ev["run"])]
     col_note = f"{diff[['session', 'run']].drop_duplicates().shape[0]} runs where Sess/Run columns differ from file names"
 
-# 4. Save
 cols = ["trial_global", "session", "run", "trial_in_run", "trial_in_session",
         "image", "ImgType", "n_presentations", "onset", "image_path"]
 cols = [c for c in cols if c in ev.columns]
 ev.insert(0, "subject", SUBJ)
 ev[["subject"] + cols].to_csv(OUT, index=False)
 
-# 5. Summary
+# summary
 print(f"\nWrote {OUT}")
 print(f"{len(ev)} trials, {ev['image'].nunique()} unique images, {len(missing)} missing image files")
 print("images shown more than once:", int((ev.groupby('image').size() > 1).sum()))

@@ -1,29 +1,31 @@
-"""Extract ResNet-50 features for the BOLD5000 images, in the same row order as y.
-
-Usage (from the repo root):
-    python3 src/extract_features.py              # CSI1, 4x4 spatial grid
-    python3 src/extract_features.py --grid 2     # smaller files
-    python3 src/extract_features.py --test 256   # timing test, saves nothing
-
-Inputs:
-    results/y/<SUBJ>_images.csv     row order shared with every y matrix
-    data/stimuli/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/
-
-Outputs in results/features/resnet50/:
-    <SUBJ>_<layer>.npy   (n_images, n_features) float32, one file per stage
-    <SUBJ>_info.json     layers, shapes, preprocessing, settings
-
-ResNet-50 is built in four stages. We take the output of each one:
-    layer1  early         256 channels on a 56x56 map
-    layer2  early-middle  512 channels on 28x28
-    layer3  middle       1024 channels on 14x14
-    layer4  deep         2048 channels on 7x7
-Each channel's map is averaged down to a grid x grid map, which keeps coarse
-information about where things are in the image.
-
-The CNN is pretrained on ImageNet and used as is (no training here). The first run
-downloads the pretrained weights (about 100 MB) to ~/.cache/torch.
 """
+Written by: Erika Sohn
+
+What this code does:
+* Extracts features for CSI1's 4,916 BOLD5000 images from a ResNet-50
+  pretrained on ImageNet, used frozen (no training or fine-tuning)
+* Takes the output of each of ResNet-50's four stages:
+      layer1  early          256 channels on a 56x56 map
+      layer2  early-middle   512 channels on 28x28
+      layer3  middle        1024 channels on 14x14
+      layer4  deep          2048 channels on 7x7
+* Average-pools each channel's map to a 4x4 grid (keeping coarse
+  information about where things are) and flattens it, giving one
+  feature vector per image per layer
+* Resizes each image to 224x224 without cropping, since participants saw
+  the whole image, then applies ImageNet normalization
+* Saves rows in the same order as the response matrices in results/y/,
+  so row i is the same image in the features and in Y
+
+Inputs: results/y/CSI1_images.csv (row order)
+        data/stimuli/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/
+Outputs: results/features/resnet50/ (CSI1_layer*.npy, CSI1_info.json)
+Run from the repo root: python3 src/extract_features.py
+    --grid 2     pool to 2x2 instead of 4x4 (smaller files)
+    --test 256   timing test on 256 images, saves nothing
+The first run downloads the pretrained weights (about 100 MB).
+"""
+
 import argparse
 import json
 import time
@@ -51,7 +53,7 @@ STIM = REPO / "data" / "stimuli" / "BOLD5000_Stimuli" / "Scene_Stimuli" / "Prese
 OUT = REPO / "results" / "features" / "resnet50"
 OUT.mkdir(parents=True, exist_ok=True)
 
-# ---- 1. Images, in y's row order ------------------------------------------------
+# == STEP 1: LOAD IMAGES == #
 order = pd.read_csv(ORDER)
 paths = {p.name: p for p in STIM.rglob("*") if p.is_file() and not p.name.startswith(".")}
 files = [paths[n] for n in order["image"]]
@@ -61,8 +63,8 @@ if args.test:
 print(f"{n_total} images, in the row order of {ORDER.name}"
       + (f"  (timing test on the first {len(files)})" if args.test else ""))
 
-# ---- 2. Pretrained ResNet-50 ----------------------------------------------------
-# We do NOT build or train the CNN. We load ResNet-50 already trained by others
+# == STEP 2: PRETRAINED RESNET-50 == # 
+# we do NOT build or train the CNN. we load ResNet-50 already trained by others
 # on ImageNet (ILSVRC-2012: about 1.28 million images in 1,000 object categories)
 # and use it frozen, only reading out its layer activations.
 #   Model and weights: torchvision ResNet-50, IMAGENET1K_V1
@@ -80,7 +82,6 @@ model = models.resnet50(weights=weights).eval().to(device)   # eval(): inference
 print(f"ResNet-50 loaded on {device}")
 
 LAYERS = ["layer1", "layer2", "layer3", "layer4"]
-
 
 def layer_outputs(x):
     """Run images through ResNet-50 stage by stage and keep each stage's output.
@@ -114,15 +115,15 @@ def to_features(fmap):
     return fmap.float().cpu().flatten(1).numpy()            # (batch, channels * grid * grid)
 
 
-# Participants saw the whole image, so resize it (no center crop), then apply
-# the ImageNet normalization ResNet-50 was trained with.
+# participants saw the whole image, so resize it (no center crop), 
+# then apply the ImageNet normalization ResNet-50 was trained with
 prep = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-# ---- 3. Run every image through the network --------------------------------------
+# == STEP 3: RUN EVERY IMG THROUGH THE CNN == #
 store = {}
 t0 = time.time()
 with torch.no_grad():
@@ -145,7 +146,6 @@ if args.test:
           f"-> full run of {n_total} images about {secs / len(files) * n_total / 60:.1f} min")
     raise SystemExit("(timing test only, nothing saved)")
 
-# ---- 4. Save and check -----------------------------------------------------------
 print(f"\n{'layer':7s} {'shape':>16s} {'% zeros':>8s}  ok")
 info_layers = {}
 for name, F in store.items():

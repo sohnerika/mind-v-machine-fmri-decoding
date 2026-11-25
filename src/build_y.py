@@ -1,24 +1,31 @@
-"""Build y (brain responses) for one BOLD5000 subject (CSI1) from Release 2.0 TYPED ROI betas
-
-For each ROI:
-  1. combine LHS and RHS voxels
-  2. z-score each voxel within each scan session to normalize
-  3. average repeated presentations of the same image
-
-Usage (from the repo root):
-    python3 src/build_y.py          # CSI1
-    python3 src/build_y.py CSI2
-
-Inputs:
-    data/<SUBJ>_trials.csv                                  (trial -> image, scan order)
-    data/fmri/roi_betas/BOLD5000_GLMsingle_ROI_betas/py/    (TYPED ROI betas)
-
-Outputs in results/y/:
-    <SUBJ>_<ROI>.npy          (n_images, n_voxels)  image-averaged responses = y
-    <SUBJ>_<ROI>_repeats.npy  (n_repeated_images, max_reps, n_voxels), NaN-padded:
-                              single presentations of the repeated images (for noise ceilings)
-    <SUBJ>_images.csv         row order shared by every y matrix
 """
+Written by: Erika Sohn
+
+What this code does:
+* Builds Y, the brain responses the encoding model predicts, for one
+  BOLD5000 subject (CSI1 by default) from the Release 2.0 GLMsingle
+  ROI betas (one beta per trial per voxel)
+* For each of the five ROIs (EarlyVis, LOC, OPA, PPA, RSC):
+    1. combines left- and right-hemisphere voxels
+    2. drops voxels with any missing (non-finite) values
+    3. z-scores each voxel within each scan session
+    4. averages repeated showings of the same image, giving one row per
+       image (this is Y)
+* Keeps each separate showing of the repeated images (this is R), used
+  later to compute noise ceilings
+* Prints each ROI's voxel counts and split-half reliability as a sanity check
+
+Note: Z in this file means the z-scored betas, not the PCA features Z
+in fit_encoding.py.
+
+Inputs: data/CSI1_trials.csv (trial -> image, in scan order; made by
+        build_trial_table_events.py)
+        data/fmri/roi_betas/BOLD5000_GLMsingle_ROI_betas/py/
+Outputs: results/y/ (CSI1_{ROI}.npy = Y, CSI1_{ROI}_repeats.npy = R,
+         CSI1_images.csv = row order shared by every Y matrix)
+Run from the repo root: python3 src/build_y.py
+"""
+
 import sys
 from pathlib import Path
 
@@ -34,11 +41,15 @@ TRIALS = REPO / "data" / f"{SUBJ}_trials.csv"
 OUT = REPO / "results" / "y"
 OUT.mkdir(parents=True, exist_ok=True)
 
-# ---- Trial table: defines row order of the betas -------------------------------
+# == STEP 1: TRIAL TABLE == # 
+
+# defines row order of betas 
+# betas are the raw ingredients of Y,
+# which equals to z-scored betas averaged over each img showing
 trials = pd.read_csv(TRIALS)
 n_trials = len(trials)
 sessions = trials["session"].to_numpy()
-codes, images = pd.factorize(trials["image"])     # images in order of first appearance
+codes, images = pd.factorize(trials["image"]) # images in order of first appearance
 counts = np.bincount(codes)
 rep_ids = np.flatnonzero(counts > 1)
 max_reps = int(counts.max())
@@ -68,7 +79,7 @@ def split_half_reliability(R):
 
 rows = []
 for roi in ROIS:
-    # 1. Combine hemispheres
+    # combine hemispheres
     parts, n_hemi = [], {}
     for hemi in ("LH", "RH"):
         f = BETAS / f"{SUBJ}_GLMbetas-TYPED-FITHRF-GLMDENOISE-RR_allses_{hemi}{roi}.npy"
@@ -81,19 +92,19 @@ for roi in ROIS:
     if X.shape[0] != n_trials:
         sys.exit(f"{roi}: betas have {X.shape[0]} rows but trial table has {n_trials}")
 
-    # Drop voxels with any non-finite value
+    # drop voxels with any non-finite value
     good = np.isfinite(X).all(axis=0)
     X = X[:, good]
 
-    # 2. z-score within session
+    # z-score within session
     Z = zscore_within_session(X)
 
-    # 3. Avg repeated presentations -> one row per unique image
+    # avg repeated presentations -> one row per unique image
     y = np.zeros((len(images), Z.shape[1]))
     np.add.at(y, codes, Z)
     y /= counts[:, None]
 
-    # Keep single presentations of repeated images for noise ceilings later
+    # keep single presentations of repeated images for noise ceilings later
     R = np.full((len(rep_ids), max_reps, Z.shape[1]), np.nan, dtype=np.float32)
     for i, img in enumerate(rep_ids):
         idx = np.flatnonzero(codes == img)
@@ -112,7 +123,7 @@ for roi in ROIS:
         "pct_r>0": round(100 * float((rel > 0).mean()), 1),
     })
 
-# Row order shared by all y matrices
+# row order shared by all y matrices
 first = trials.drop_duplicates("image").set_index("image").loc[images]
 img_table = pd.DataFrame({"row": np.arange(len(images)), "image": images,
                           "n_presentations": counts})
