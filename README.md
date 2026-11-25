@@ -39,7 +39,6 @@ flowchart LR
 <p align="center">
   <img src="assets/resnet_architecture.svg" alt="ResNet-50 architecture with the early, middle, and deep layers used for feature extraction" width="700">
 </p>
-
 **Step 2: Predict brain activity.** A regression model learns how the CNN features relate to fMRI voxel activity in each brain region. We check how well it predicts brain responses for images it hasn't seen before.
  
 **Step 3: Decode the image with Bayes.** Now we flip it. Given a brain scan, we score every candidate image by its likelihood (how well its predicted brain response matches the real scan) and its prior (how likely that image was to begin with), then pick the image with the best combined score.
@@ -49,9 +48,8 @@ flowchart LR
 <p align="center">
   <img src="assets/cnn_layers_brain_regions.svg" alt="CNN layers mapped to expected brain regions: early to EVC, middle to LOC, deep to PPA, OPA, and RSC" width="900">
 </p>
-
 **Step 5: Copulas.** Regression captures the average relationship between predicted and actual brain activity, but not whether that relationship changes at the extremes. Using unseen images, we pair each region's predicted response with its actual response and fit several copula families to these pairs. A Gaussian copula treats the relationship as symmetric, Clayton captures stronger agreement when both values are low, and Gumbel captures stronger agreement when both values are high. We pick the best-fitting family using AIC.
-
+ 
 ---
  
 ## Data
@@ -76,10 +74,10 @@ We focus on participant **CSI1** (15 sessions, 5,254 trials, 4,916 unique images
 aws s3 cp --no-sign-request s3://openneuro.org/ds001499/ data/fmri/ds001499 --recursive --exclude "*" --include "sub-CSI1/*events.tsv"
 ```
 The data files are too big for GitHub, so they're not included in this repo.
-
+ 
 ### Running the pipeline
 Run the scripts in `src/` in order, from the repo root:
-
+ 
 | Step | Script | What it does |
 |------|--------|--------------|
 | 1 | `01_download_csi1_typed.sh` | Downloads the data |
@@ -89,24 +87,28 @@ Run the scripts in `src/` in order, from the repo root:
 | 5 | `05_extract_features.py` | Extracts ResNet-50 features from all four layers |
 | 6 | `06_fit_encoding.py` | Fits the encoding model (PCA + ridge regression per voxel) and scores it against each voxel's noise ceiling |
 | 7 | `07_table2_bootstrap.py` | Bootstrap confidence intervals for the layer comparisons |
-
+ 
 `check_outputs.py` confirms the split, brain responses, and encoding results match our report. `inspect_roi_betas.py` is an optional look at the raw ROI data.
-
+ 
 ---
-
+ 
 ## Method 1 Findings: Issues and Next Steps
-
-Running Method 1 surfaced a few weaknesses in our analysis. Some are already fixed and the rest are planned for the next stage.
-
+ 
+### Results so far
+- Deeper layers predict the higher visual regions much better. Layer 4 beats Layer 1 in LOC, OPA, PPA, and RSC by 0.17-0.22 in r / noise ceiling
+- Early visual cortex shows no difference between Layer 1 and Layer 4, so the expected early-layer match doesn't appear. Layer 3 predicts it best
+- The best layer for each region reaches 71-91% of the correlation a perfect model could reach, given fMRI noise
+Running Method 1 also surfaced a few weaknesses in our analysis. Some are already fixed and the rest are planned for the next stage.
+ 
 ### Fixed
-
+ 
 | Issue | What we found | Fix |
 |-------|---------------|-----|
-| Confidence intervals were too narrow | Our first CIs resampled voxels, but neighboring voxels share signal and noise, so they aren't independent. This made the intervals 2-4x too narrow | Resample test images instead (`07_table2_bootstrap.py`). This showed PPA's Layer 3 advantage over Layer 4 is not reliable, so it's now treated as a tie |
+| Confidence intervals were too narrow | Our first CIs resampled voxels, but neighboring voxels share signal and noise, so they aren't independent. This made the intervals 2-5x too narrow | Resample test images instead (`07_table2_bootstrap.py`). This showed PPA's Layer 3 advantage over Layer 4 is not reliable, so it's now treated as a tie |
 | Results might depend on the noise ceiling cutoff | We drop voxels with a noise ceiling below 0.1, which was an arbitrary choice | Reran with cutoffs from 0.05 to 0.3. The best layer per region holds from 0.05 to 0.2, and only OPA's tie flips at 0.3 |
-
+ 
 ### Next steps
-
+ 
 | Issue | Why it matters | Plan |
 |-------|----------------|------|
 | No baseline | We can't tell if the layer pattern comes from ImageNet training or just the CNN's architecture | Repeat Method 1 with an untrained, random-weights ResNet-50 |
@@ -139,5 +141,9 @@ Python, PyTorch, CNNs, regression, Bayesian inference, copulas, fMRI analysis, d
  
 ## References
 Chang, N., Pyles, J. A., Marcus, A., Gupta, A., Tarr, M. J., & Aminoff, E. M. (2019). BOLD5000, a public fMRI dataset while viewing 5000 visual images. *Scientific Data, 6*, 49.
+ 
+He, K., Zhang, X., Ren, S., & Sun, J. (2016). Deep residual learning for image recognition. *Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition*, 770-778.
+ 
+Naselaris, T., Prenger, R. J., Kay, K. N., Oliver, M., & Gallant, J. L. (2009). Bayesian reconstruction of natural images from human brain activity. *Neuron, 63*(6), 902-915.
  
 Prince, J. S., Charest, I., Kurzawski, J. W., Pyles, J. A., Tarr, M. J., & Kay, K. N. (2022). Improving the accuracy of single-trial fMRI response estimates using GLMsingle. *eLife, 11*, e77599.
