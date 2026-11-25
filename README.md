@@ -5,7 +5,7 @@
 </p>
 Do artificial and biological vision systems process images in similar ways?
  
-The human visual system processes what we see in a hierarchy: early regions respond to edges and colors, while later regions respond to whole objects and scenes. CNNs were inspired by this design and learn a similar layered sequence. Drawing on Claude Shannon's information theory, many researchers argue this is no coincidence: any system that efficiently encodes natural images may converge on a similar solution.
+The human visual system processes what we see in a hierarchy: early regions respond to edges and colors, while later regions respond to whole objects and scenes. CNNs were inspired by this design and learn a similar layered sequence. Drawing on the efficient coding hypothesis, which builds on Claude Shannon's information theory, many researchers argue this is no coincidence: any system that efficiently encodes natural images may converge on a similar solution.
  
 This project puts that idea to the test. Using fMRI scans from people viewing ~5,000 natural images (BOLD5000), we build **encoding models** that predict voxel-level brain activity from CNN features, then flip them into a **Bayesian decoder** that identifies which image a person was viewing from their brain activity alone.
  
@@ -17,7 +17,7 @@ This project puts that idea to the test. Using fMRI scans from people viewing ~5
 |---|----------|----------|
 | **RQ1** | Do early, middle, and deep CNN layers strictly correspond to early, middle, and late visual processing regions in the human brain? | Compare encoding accuracy of each CNN layer across each visual region of interest or ROI |
 | **RQ2** | How much does adding an image prior help the Bayesian model pick the right image, compared to relying only on the predicted brain response? | Compare identification accuracy of likelihood-only vs. full posterior (likelihood × prior) decoding |
-| **RQ3** | Which copula family best captures the non-linear dependency structure and tail behavior between CNN feature representations and fMRI voxel activations? | Fit copulas to feature–voxel pairs and compare by AIC and tail dependence |
+| **RQ3** | Which copula family best captures the non-linear dependency structure and tail behavior between CNN feature representations and fMRI voxel activations? | Fit copulas to feature-voxel pairs and compare by AIC and tail dependence |
  
 ---
  
@@ -26,7 +26,7 @@ This project puts that idea to the test. Using fMRI scans from people viewing ~5
 ```mermaid
 flowchart LR
     A[Images] --> B[Pretrained CNN<br/>ResNet]
-    B --> C[Features from 3 layers<br/>early, middle, deep]
+    B --> C[Features from 4 layers<br/>early to deep]
     C --> D[Regression model]
     E[fMRI voxel data] --> D
     D --> F[Predicted brain response]
@@ -34,7 +34,7 @@ flowchart LR
     G --> H[Guess which image<br/>they were viewing]
 ```
  
-**Step 1: Get CNN features.** We run each image through a pretrained ResNet-50 and extract features from three layers (early, middle, and deep). Each layer slides small learned filters, called kernels, across the image to produce feature maps. Early kernels detect edges and colors, while deeper ones combine these to detect textures, object parts, and whole objects. We average each layer's feature maps across space to get one feature vector per image.
+**Step 1: Get CNN features.** We run each image through a pretrained ResNet-50 and extract features from all four of its layers, from early to deep. Each layer slides small learned filters, called kernels, across the image to produce feature maps. Early kernels detect edges and colors, while deeper ones combine these to detect textures, object parts, and whole objects. We average each layer's feature maps down to a 4x4 grid, which keeps coarse information about where things are in the image, and flatten it into one feature vector per image.
  
 <p align="center">
   <img src="assets/resnet_architecture.svg" alt="ResNet-50 architecture with the early, middle, and deep layers used for feature extraction" width="700">
@@ -62,7 +62,7 @@ flowchart LR
  
 We use the **BOLD5000** dataset, where 4 participants viewed around 5,000 images (from SUN, COCO, and ImageNet) inside an fMRI scanner.
  
-We focus on participant **CSI1** (15 sessions, 5,254 trials, 4,916 unique images) and use the Release 2.0 single-trial brain responses, estimated with GLMsingle, for five visual regions: early visual cortex (EVC), LOC, OPA, PPA, and RSC.
+We focus on participant **CSI1** (15 sessions, 5,254 trials, 4,916 unique images) and use the Release 2.0 single-trial brain responses, estimated with GLMsingle, for five visual regions: early visual cortex (EarlyVis, labeled EVC in the figures), LOC, OPA, PPA, and RSC.
  
 | Source | What's there |
 |--------|--------------|
@@ -79,9 +79,22 @@ We focus on participant **CSI1** (15 sessions, 5,254 trials, 4,916 unique images
 ```bash
 aws s3 cp --no-sign-request s3://openneuro.org/ds001499/ data/fmri/ds001499 --recursive --exclude "*" --include "sub-CSI1/*events.tsv"
 ```
-4. Build the trial table that maps each trial to its image (`src/02_build_trial_table_events.py`)
-5. Build the brain response matrices (`src/03_build_y.py`). This combines hemispheres, z-scores each voxel within each session, and averages repeated images.
 The data files are too big for GitHub, so they're not included in this repo.
+
+### Running the pipeline
+Run the scripts in `src/` in order, from the repo root:
+
+| Step | Script | What it does |
+|------|--------|--------------|
+| 1 | `01_download_csi1_typed.sh` | Downloads the data |
+| 2 | `02_build_trial_table_events.py` | Builds the trial table that maps each trial to its image. Its output, `CSI1_trials.csv`, needs to be in `data/` for the next step |
+| 3 | `03_build_y.py` | Builds the brain response matrices. Combines hemispheres, z-scores each voxel within each session, and averages repeated images |
+| 4 | `04_make_split.py` | Splits images into train (80%) and test (20%), stratified by image source, with 5 CV folds |
+| 5 | `05_extract_features.py` | Extracts ResNet-50 features from all four layers |
+| 6 | `06_fit_encoding.py` | Fits the encoding model (PCA + ridge regression per voxel) and scores it against each voxel's noise ceiling |
+| 7 | `07_table2_bootstrap.py` | Bootstrap confidence intervals for the layer comparisons |
+
+`check_outputs.py` confirms the split, brain responses, and encoding results match our report. `inspect_roi_betas.py` is an optional look at the raw ROI data.
  
 ---
  
@@ -93,7 +106,7 @@ mind-vs-machine-fmri-decoding/
 ├── data/            # BOLD5000 images and fMRI data (not tracked)
 ├── notebooks/       # Analysis notebooks
 ├── src/             # Feature extraction, models, and decoding code
-├── results/         # Plots and outputs
+├── results/         # Outputs (only the small result tables are tracked)
 ├── LICENSE
 └── README.md
 ```
