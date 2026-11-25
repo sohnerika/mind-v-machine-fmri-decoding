@@ -16,7 +16,7 @@ Inputs: results/features/resnet50/ (CSI1_layer*.npy)
         results/split/CSI1_split.npz
 Outputs: results/encoding/resnet50/ (CSI1_layer*_model.npz, CSI1_voxels.csv,
          CSI1_summary.csv)
-Run from src/: python fit_encoding.py
+Run from src/: python 06_fit_encoding.py
 """
 
 import argparse

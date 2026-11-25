@@ -4,7 +4,7 @@
 #
 # Usage (from the folder that holds ds001499 and BOLD5000_Stimuli):
 #     cd ~/Documents/bold5000
-#     caffeinate -i bash download_csi1_typed.sh
+#     caffeinate -i bash 01_download_csi1_typed.sh
 #
 # Safe to rerun: files that are already complete and verified are skipped, and
 # interrupted downloads resume where they stopped.

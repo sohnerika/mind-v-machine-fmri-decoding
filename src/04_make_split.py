@@ -15,7 +15,7 @@ What this code does:
 Inputs: results/y/CSI1_images.csv
 Outputs: results/split/ (CSI1_split.npz with train_idx, test_idx, cv_fold;
          CSI1_split.csv, one row per image with its split and fold)
-Run from src/: python make_split.py
+Run from src/: python 04_make_split.py
 """
 
 import argparse

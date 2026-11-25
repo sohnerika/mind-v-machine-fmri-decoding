@@ -16,14 +16,14 @@ What this code does:
 * Prints each ROI's voxel counts and split-half reliability as a sanity check
 
 Note: Z in this file means the z-scored betas, not the PCA features Z
-in fit_encoding.py.
+in 06_fit_encoding.py.
 
 Inputs: data/CSI1_trials.csv (trial -> image, in scan order; made by
-        build_trial_table_events.py)
+        02_build_trial_table_events.py)
         data/fmri/roi_betas/BOLD5000_GLMsingle_ROI_betas/py/
 Outputs: results/y/ (CSI1_{ROI}.npy = Y, CSI1_{ROI}_repeats.npy = R,
          CSI1_images.csv = row order shared by every Y matrix)
-Run from the repo root: python3 src/build_y.py
+Run from the repo root: python3 src/03_build_y.py
 """
 
 import sys

@@ -5,3 +5,4 @@ __pycache__/
 *.mat
 results/
 .DS_Store
+__pycache__/

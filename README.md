@@ -79,8 +79,8 @@ We focus on participant **CSI1** (15 sessions, 5,254 trials, 4,916 unique images
 ```bash
 aws s3 cp --no-sign-request s3://openneuro.org/ds001499/ data/fmri/ds001499 --recursive --exclude "*" --include "sub-CSI1/*events.tsv"
 ```
-4. Build the trial table that maps each trial to its image (`src/build_trial_table_events.py`)
-5. Build the brain response matrices (`src/build_y.py`). This combines hemispheres, z-scores each voxel within each session, and averages repeated images.
+4. Build the trial table that maps each trial to its image (`src/02_build_trial_table_events.py`)
+5. Build the brain response matrices (`src/03_build_y.py`). This combines hemispheres, z-scores each voxel within each session, and averages repeated images.
 The data files are too big for GitHub, so they're not included in this repo.
  
 ---

@@ -13,8 +13,8 @@ Inputs: OpenNeuro events.tsv files and BOLD5000_Stimuli presentation lists
 Output: <SUBJ>_trials.csv (one row per trial, in scan order; 5,254 trials
         for CSI1)
 Run from Terminal, inside ~/bold5000:
-    python3 build_trial_table_events.py          CSI1 by default
-    python3 build_trial_table_events.py CSI2     another subject
+    python3 02_build_trial_table_events.py          CSI1 by default
+    python3 02_build_trial_table_events.py CSI2     another subject
 """
 
 import re

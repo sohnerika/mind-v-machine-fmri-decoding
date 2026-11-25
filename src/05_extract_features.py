@@ -20,7 +20,7 @@ What this code does:
 Inputs: results/y/CSI1_images.csv (row order)
         data/stimuli/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/
 Outputs: results/features/resnet50/ (CSI1_layer*.npy, CSI1_info.json)
-Run from the repo root: python3 src/extract_features.py
+Run from the repo root: python3 src/05_extract_features.py
     --grid 2     pool to 2x2 instead of 4x4 (smaller files)
     --test 256   timing test on 256 images, saves nothing
 The first run downloads the pretrained weights (about 100 MB).

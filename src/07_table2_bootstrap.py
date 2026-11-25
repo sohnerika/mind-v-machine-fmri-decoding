@@ -11,7 +11,7 @@ What this code does:
 
 Inputs: results/encoding/resnet50/ (CSI1_voxels.csv, CSI1_layer*_model.npz)
         results/y/ (CSI1_{ROI}.npy)
-Run from src/: python table2_bootstrap.py
+Run from src/: python 07_table2_bootstrap.py
 """
 
 import numpy as np, pandas as pd
